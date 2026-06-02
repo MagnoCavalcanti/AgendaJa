@@ -1,0 +1,26 @@
+{
+  // Configuração do compilador TypeScript para um projeto Next.js (App Router).
+  "compilerOptions": {
+    "target": "ES2017",                       // Versão de JavaScript de saída.
+    "lib": ["dom", "dom.iterable", "esnext"], // Bibliotecas de tipos disponíveis (DOM + recursos modernos).
+    "allowJs": true,                          // Permite importar arquivos .js junto com .ts.
+    "skipLibCheck": true,                      // Não checa tipos dentro de node_modules (build mais rápido).
+    "strict": true,                            // Ativa todas as verificações estritas de tipos (boas práticas).
+    "noEmit": true,                            // O Next.js cuida da emissão; o tsc só valida tipos.
+    "esModuleInterop": true,                   // Compatibilidade entre módulos CommonJS e ES.
+    "module": "esnext",                        // Sistema de módulos moderno.
+    "moduleResolution": "bundler",             // Resolução de módulos recomendada pelo Next 14.
+    "resolveJsonModule": true,                 // Permite importar arquivos .json.
+    "isolatedModules": true,                   // Cada arquivo é tratado como módulo isolado (exigido pelo SWC).
+    "jsx": "preserve",                         // Mantém o JSX para o Next.js transformar.
+    "incremental": true,                       // Cache de compilação incremental.
+    "plugins": [{ "name": "next" }],           // Plugin oficial do Next para TypeScript.
+    "paths": {
+      "@/*": ["./src/*"]                       // Alias: "@/lib/..." aponta para "src/lib/...".
+    }
+  },
+  // Arquivos que o TypeScript deve analisar.
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  // Pastas ignoradas.
+  "exclude": ["node_modules"]
+}

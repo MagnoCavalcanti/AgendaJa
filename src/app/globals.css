@@ -1,0 +1,43 @@
+/* Importa as três camadas do Tailwind: base, componentes e utilitários. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * VARIÁVEIS DE TEMA (tokens de design no padrão ShadCN).
+ * Definidas em HSL para facilitar ajustes. O tailwind.config.ts lê essas
+ * variáveis em "colors", então qualquer mudança aqui reflete no app inteiro.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;          /* Fundo branco. */
+    --foreground: 222 47% 11%;        /* Texto quase preto. */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;           /* Azul de destaque (botões principais). */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;  /* Texto secundário/cinza. */
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;         /* Vermelho (ações de exclusão). */
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;            /* Cor das bordas. */
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;              /* Cor do anel de foco (acessibilidade). */
+    --radius: 0.5rem;                 /* Raio de borda padrão. */
+  }
+}
+
+/* Estilos base aplicados a todos os elementos. */
+@layer base {
+  * {
+    @apply border-border; /* Bordas usam a variável de tema por padrão. */
+  }
+  body {
+    @apply bg-background text-foreground; /* Fundo e texto seguem o tema. */
+    font-feature-settings: "rlig" 1, "calt" 1; /* Ligaduras tipográficas. */
+  }
+}
