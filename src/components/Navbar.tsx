@@ -1,21 +1,14 @@
-"use client"; // Usa signOut e usePathname => precisa rodar no cliente.
+"use client";
 
-// ============================================================================
-// NAVBAR DO PAINEL
-// Exibe o nome do usuário, os links de navegação e o botão de sair.
-// Recebe o nome via props (vindo do Server Component que já tem a sessão),
-// evitando uma busca extra no cliente.
-// ============================================================================
-
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation"; // Sabe a rota atual (para destacar o link ativo).
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
-// Links do menu do painel.
 const links = [
   { href: "/dashboard", label: "Início" },
   { href: "/dashboard/services", label: "Serviços" },
@@ -23,13 +16,13 @@ const links = [
 ];
 
 export function Navbar({ userName }: { userName: string }) {
-  const pathname = usePathname(); // Rota atual, ex: "/dashboard/services".
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="border-b">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        {/* Logo + links */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
           <span className="font-bold text-primary">AgendaJá</span>
           <nav className="hidden gap-1 md:flex">
             {links.map((link) => (
@@ -38,7 +31,6 @@ export function Navbar({ userName }: { userName: string }) {
                 href={link.href}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent",
-                  // Destaca o link da rota ativa.
                   pathname === link.href
                     ? "bg-accent font-medium"
                     : "text-muted-foreground"
@@ -50,9 +42,7 @@ export function Navbar({ userName }: { userName: string }) {
           </nav>
         </div>
 
-        {/* Usuário + sair */}
-        <div className="flex items-center gap-3">
-          {/* Avatar gerado a partir do nome (imagem otimizada pelo Next). */}
+        <div className="flex items-center gap-2">
           <Image
             src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
               userName
@@ -63,7 +53,20 @@ export function Navbar({ userName }: { userName: string }) {
             className="rounded-full"
           />
           <span className="hidden text-sm font-medium sm:inline">{userName}</span>
-          {/* signOut encerra a sessão e redireciona para a home. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -74,6 +77,32 @@ export function Navbar({ userName }: { userName: string }) {
           </Button>
         </div>
       </div>
+
+      {menuOpen && (
+        <nav
+          className="border-t bg-card px-4 py-2 md:hidden"
+          aria-label="Menu principal"
+        >
+          <ul className="flex flex-col gap-1">
+            {links.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "block rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent",
+                    pathname === link.href
+                      ? "bg-accent font-medium"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }

@@ -52,6 +52,35 @@ export async function createService(formData: FormData) {
 }
 
 // ---------------------------------------------------------------------------
+// UPDATE: atualiza um serviço existente pelo id.
+// ---------------------------------------------------------------------------
+export async function updateService(id: string, formData: FormData) {
+  await exigirSessao();
+  await dbConnect();
+
+  const name = String(formData.get("name") ?? "");
+  const description = String(formData.get("description") ?? "");
+  const durationMin = Number(formData.get("durationMin") ?? 0);
+  const price = Number(formData.get("price") ?? 0);
+
+  if (!name || durationMin <= 0 || price < 0) {
+    throw new Error("Dados do serviço inválidos.");
+  }
+
+  const atualizado = await Service.findByIdAndUpdate(
+    id,
+    { name, description, durationMin, price },
+    { new: true }
+  );
+
+  if (!atualizado) {
+    throw new Error("Serviço não encontrado.");
+  }
+
+  revalidatePath("/dashboard/services");
+}
+
+// ---------------------------------------------------------------------------
 // DELETE: remove um serviço pelo id.
 // ---------------------------------------------------------------------------
 export async function deleteService(id: string) {

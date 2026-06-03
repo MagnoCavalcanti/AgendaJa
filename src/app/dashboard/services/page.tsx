@@ -9,6 +9,8 @@ import { dbConnect } from "@/lib/mongodb";
 import { Service } from "@/models/Service";
 import { formatCurrency } from "@/lib/utils";
 import { ServiceForm } from "@/components/ServiceForm";
+import { EditServiceModal } from "@/components/EditServiceModal";
+import { EditServiceButton } from "@/components/EditServiceButton";
 import { DeleteServiceButton } from "@/components/DeleteServiceButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
@@ -33,6 +35,7 @@ export default async function ServicesPage() {
 
   return (
     <div className="space-y-6">
+      <EditServiceModal />
       <h1 className="text-2xl font-bold">Serviços</h1>
 
       {/* Cartão com o formulário de cadastro. */}
@@ -68,8 +71,18 @@ export default async function ServicesPage() {
                   </span>
                 </div>
               </div>
-              {/* Botão de exclusão (Client Component dentro do Server Component). */}
-              <DeleteServiceButton id={s.id} />
+              <div className="flex shrink-0 items-center gap-1">
+                <EditServiceButton
+                  service={{
+                    id: s.id,
+                    name: s.name,
+                    description: s.description,
+                    durationMin: s.durationMin,
+                    price: s.price,
+                  }}
+                />
+                <DeleteServiceButton id={s.id} />
+              </div>
             </CardContent>
           </Card>
         ))}

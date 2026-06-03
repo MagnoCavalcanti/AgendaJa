@@ -12,9 +12,12 @@ import { ptBR } from "date-fns/locale";
 import { authOptions } from "@/lib/auth";
 import { dbConnect } from "@/lib/mongodb";
 import { Appointment } from "@/models/Appointment";
+import { APPOINTMENT_STATUS_LABELS } from "@/lib/appointment-status";
+import { AppointmentActions } from "@/components/AppointmentActions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import type { AppointmentStatus } from "@/types";
 
 // As props de uma página recebem "params" com os segmentos dinâmicos da URL.
 export default async function AppointmentDetail({
@@ -60,8 +63,13 @@ export default async function AppointmentDetail({
           </p>
           <p>
             <span className="text-muted-foreground">Status: </span>
-            {doc.status}
+            {APPOINTMENT_STATUS_LABELS[doc.status as AppointmentStatus]}
           </p>
+          <AppointmentActions
+            id={params.id}
+            status={doc.status as AppointmentStatus}
+            layout="stack"
+          />
         </CardContent>
       </Card>
     </div>

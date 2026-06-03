@@ -25,8 +25,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  maskDateBR,
+  maskTimeBR,
+  parseAppointmentDateTime,
+  validateClientName,
+  isCompleteDateBR,
+  isCompleteTimeBR,
+} from "@/lib/appointment-datetime";
+import { APPOINTMENT_STATUS_LABELS } from "@/lib/appointment-status";
 import { formatCurrency } from "@/lib/utils";
+import { AppointmentActions } from "@/components/AppointmentActions";
 import type { IService, IAppointment, AppointmentStatus } from "@/types";
+import type { StatusFilter } from "@/store/useUIStore";
+
+const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "TODOS", label: "Todos" },
+  { value: "PENDENTE", label: "Agendados" },
+  { value: "CONFIRMADO", label: "Efetuados" },
+  { value: "CANCELADO", label: "Cancelados" },
+];
 
 // ---------------------------------------------------------------------------
 // Funções de acesso à API (camada de fetch reutilizada pelos hooks).
@@ -53,9 +71,11 @@ export function AppointmentsClient() {
   const statusFilter = useUIStore((s) => s.statusFilter);
   const setStatusFilter = useUIStore((s) => s.setStatusFilter);
 
-  // Campos locais do formulário do modal.
   const [serviceId, setServiceId] = useState("");
-  const [date, setDate] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [dateBR, setDateBR] = useState("");
+  const [timeBR, setTimeBR] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   // ----- QUERIES (leitura com cache automático) -----
   const servicesQuery = useQuery({
@@ -70,40 +90,68 @@ export function AppointmentsClient() {
 
   // ----- MUTATION: criar agendamento -----
   const createMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (payload: {
+      serviceId: string;
+      clientName: string;
+      dateBR: string;
+      timeBR: string;
+      date: string;
+    }) => {
       const res = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serviceId, date }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Falha ao criar agendamento");
-      return res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Falha ao criar agendamento"
+        );
+      }
+      return data;
     },
     onSuccess: () => {
-      // Invalida o cache: o React Query re-busca a lista atualizada sozinho.
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      // Limpa o formulário e fecha o modal.
       setServiceId("");
-      setDate("");
+      setClientName("");
+      setDateBR("");
+      setTimeBR("");
+      setFormError(null);
       closeModal();
+    },
+    onError: (err: Error) => {
+      setFormError(err.message);
     },
   });
 
-  // ----- MUTATION: cancelar agendamento (PATCH status) -----
-  const cancelMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/appointments/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CANCELADO" }),
-      });
-      if (!res.ok) throw new Error("Falha ao cancelar");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointments"] });
-    },
-  });
+  const parsedDateTime = parseAppointmentDateTime(dateBR, timeBR);
+  const clientNameError = validateClientName(clientName);
+  const canSubmit =
+    !!serviceId &&
+    !clientNameError &&
+    parsedDateTime.ok &&
+    !createMutation.isPending;
+
+  function handleCreate() {
+    setFormError(null);
+    const nameErr = validateClientName(clientName);
+    if (nameErr) {
+      setFormError(nameErr);
+      return;
+    }
+    const parsed = parseAppointmentDateTime(dateBR, timeBR);
+    if (!parsed.ok) {
+      setFormError(parsed.message);
+      return;
+    }
+    createMutation.mutate({
+      serviceId,
+      clientName: clientName.trim(),
+      dateBR,
+      timeBR,
+      date: parsed.date.toISOString(),
+    });
+  }
 
   // Aplica o filtro de status (estado vindo do Zustand) sobre os dados do cache.
   const appointments = (appointmentsQuery.data ?? []).filter((a) =>
@@ -120,14 +168,14 @@ export function AppointmentsClient() {
 
       {/* Filtros de status (alteram o estado de UI no Zustand). */}
       <div className="flex flex-wrap gap-2">
-        {(["TODOS", "PENDENTE", "CONFIRMADO", "CANCELADO"] as const).map((f) => (
+        {FILTER_OPTIONS.map((f) => (
           <Button
-            key={f}
+            key={f.value}
             size="sm"
-            variant={statusFilter === f ? "default" : "outline"}
-            onClick={() => setStatusFilter(f)}
+            variant={statusFilter === f.value ? "default" : "outline"}
+            onClick={() => setStatusFilter(f.value)}
           >
-            {f}
+            {f.label}
           </Button>
         ))}
       </div>
@@ -158,23 +206,17 @@ export function AppointmentsClient() {
                   {a.serviceName}
                 </Link>
                 <p className="text-sm text-muted-foreground">
+                  Cliente: {a.clientName}
+                </p>
+                <p className="text-sm text-muted-foreground">
                   {format(new Date(a.date), "dd 'de' MMMM 'às' HH:mm", {
                     locale: ptBR,
                   })}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
                 <StatusBadge status={a.status} />
-                {a.status !== "CANCELADO" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={cancelMutation.isPending}
-                    onClick={() => cancelMutation.mutate(a._id)}
-                  >
-                    Cancelar
-                  </Button>
-                )}
+                <AppointmentActions id={a._id} status={a.status} />
               </div>
             </CardContent>
           </Card>
@@ -202,26 +244,78 @@ export function AppointmentsClient() {
             </select>
           </div>
           <div>
-            <Label htmlFor="date">Data e hora</Label>
+            <Label htmlFor="clientName">Nome do cliente</Label>
             <Input
-              id="date"
-              type="datetime-local"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              id="clientName"
+              value={clientName}
+              onChange={(e) => {
+                setClientName(e.target.value);
+                setFormError(null);
+              }}
+              placeholder="Ex: João Silva"
+              maxLength={80}
+              autoComplete="name"
             />
+            {clientName.length > 0 && clientNameError && (
+              <p className="mt-1 text-xs text-destructive">{clientNameError}</p>
+            )}
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="dateBR">Data</Label>
+              <Input
+                id="dateBR"
+                value={dateBR}
+                onChange={(e) => {
+                  setDateBR(maskDateBR(e.target.value));
+                  setFormError(null);
+                }}
+                placeholder="DD/MM/AAAA"
+                inputMode="numeric"
+                maxLength={10}
+                aria-invalid={
+                  dateBR.length > 0 && !isCompleteDateBR(dateBR)
+                    ? true
+                    : undefined
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="timeBR">Horário</Label>
+              <Input
+                id="timeBR"
+                value={timeBR}
+                onChange={(e) => {
+                  setTimeBR(maskTimeBR(e.target.value));
+                  setFormError(null);
+                }}
+                placeholder="HH:MM"
+                inputMode="numeric"
+                maxLength={5}
+                aria-invalid={
+                  timeBR.length > 0 && !isCompleteTimeBR(timeBR)
+                    ? true
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+          {dateBR.length === 10 &&
+            timeBR.length === 5 &&
+            !parsedDateTime.ok && (
+              <p className="text-xs text-destructive">{parsedDateTime.message}</p>
+            )}
 
-          {createMutation.isError && (
-            <p className="text-sm text-destructive">Não foi possível agendar.</p>
+          {formError && (
+            <p className="text-sm text-destructive">{formError}</p>
           )}
 
           <Button
             className="w-full"
-            // Desabilita se faltar dado ou enquanto a mutação está em andamento.
-            disabled={!serviceId || !date || createMutation.isPending}
-            onClick={() => createMutation.mutate()}
+            disabled={!canSubmit}
+            onClick={handleCreate}
           >
-            {createMutation.isPending ? "Agendando..." : "Confirmar agendamento"}
+            {createMutation.isPending ? "Agendando..." : "Agendar"}
           </Button>
         </div>
       </Modal>
@@ -238,7 +332,7 @@ function StatusBadge({ status }: { status: AppointmentStatus }) {
   };
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
-      {status}
+      {APPOINTMENT_STATUS_LABELS[status]}
     </span>
   );
 }

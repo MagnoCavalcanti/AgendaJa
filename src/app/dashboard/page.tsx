@@ -42,7 +42,7 @@ export default async function DashboardHome() {
       <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard title="Serviços cadastrados" value={totalServicos} />
         <MetricCard title="Meus agendamentos" value={totalAgendamentos} />
-        <MetricCard title="Pendentes" value={pendentes} />
+        <MetricCard title="Aguardando atendimento" value={pendentes} />
       </div>
     </div>
   );

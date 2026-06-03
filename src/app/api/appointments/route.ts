@@ -9,6 +9,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import {
+  parseAppointmentDateTime,
+  validateClientName,
+} from "@/lib/appointment-datetime";
 import { dbConnect } from "@/lib/mongodb";
 import { Appointment } from "@/models/Appointment";
 import { Service } from "@/models/Service";
@@ -53,19 +57,47 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Lê os dados enviados pelo formulário (id do serviço e data).
-    const { serviceId, date } = await request.json();
+    const { serviceId, date, dateBR, timeBR, clientName } = await request.json();
 
-    if (!serviceId || !date) {
+    if (!serviceId) {
       return NextResponse.json(
-        { error: "Serviço e data são obrigatórios." },
+        { error: "Serviço é obrigatório." },
+        { status: 400 }
+      );
+    }
+
+    const clientNameError = validateClientName(
+      typeof clientName === "string" ? clientName : ""
+    );
+    if (clientNameError) {
+      return NextResponse.json({ error: clientNameError }, { status: 400 });
+    }
+
+    let appointmentDate: Date;
+    if (typeof dateBR === "string" && typeof timeBR === "string") {
+      const parsed = parseAppointmentDateTime(dateBR, timeBR);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.message }, { status: 400 });
+      }
+      appointmentDate = parsed.date;
+    } else if (date) {
+      const fallback = new Date(date);
+      if (Number.isNaN(fallback.getTime()) || fallback.getTime() <= Date.now()) {
+        return NextResponse.json(
+          { error: "Data e horário inválidos." },
+          { status: 400 }
+        );
+      }
+      appointmentDate = fallback;
+    } else {
+      return NextResponse.json(
+        { error: "Data e horário são obrigatórios." },
         { status: 400 }
       );
     }
 
     await dbConnect();
 
-    // Busca o serviço para copiar o nome (desnormalização) e validar a existência.
     const service = await Service.findById(serviceId);
     if (!service) {
       return NextResponse.json(
@@ -74,13 +106,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cria o agendamento vinculado ao usuário da sessão.
     const novo = await Appointment.create({
       service: service._id,
       serviceName: service.name,
       user: session.user.id,
-      clientName: session.user.name ?? "Cliente",
-      date: new Date(date),
+      clientName: clientName.trim(),
+      date: appointmentDate,
       status: "PENDENTE",
     });
 

@@ -8,8 +8,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import {
+  getTransitionError,
+  isAppointmentStatus,
+} from "@/lib/appointment-status";
 import { dbConnect } from "@/lib/mongodb";
 import { Appointment } from "@/models/Appointment";
+import type { AppointmentStatus } from "@/types";
 
 // Tipo do segundo argumento: contém os parâmetros dinâmicos da URL.
 interface RouteContext {
@@ -26,24 +31,50 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 
   try {
-    const { status } = await request.json();
+    const { status: newStatus } = await request.json();
+
+    if (!isAppointmentStatus(newStatus)) {
+      return NextResponse.json({ error: "Status inválido." }, { status: 400 });
+    }
+
     await dbConnect();
 
-    // Atualiza só se o agendamento pertencer ao usuário logado (segurança).
-    const atualizado = await Appointment.findOneAndUpdate(
-      { _id: params.id, user: session.user.id }, // Filtro: id + dono.
-      { status },                                 // Campo a alterar.
-      { new: true }                               // Retorna o documento já atualizado.
-    );
+    const atual = await Appointment.findOne({
+      _id: params.id,
+      user: session.user.id,
+    });
 
-    if (!atualizado) {
+    if (!atual) {
       return NextResponse.json(
         { error: "Agendamento não encontrado." },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ message: "Status atualizado." });
+    const transitionError = getTransitionError(
+      atual.status as AppointmentStatus,
+      newStatus
+    );
+    if (transitionError) {
+      return NextResponse.json({ error: transitionError }, { status: 400 });
+    }
+
+    const atualizado = await Appointment.findOneAndUpdate(
+      { _id: params.id, user: session.user.id },
+      { status: newStatus },
+      { new: true }
+    );
+
+    const messages: Record<AppointmentStatus, string> = {
+      CONFIRMADO: "Agendamento marcado como efetuado.",
+      CANCELADO: "Agendamento cancelado.",
+      PENDENTE: "Status atualizado.",
+    };
+
+    return NextResponse.json({
+      message: messages[newStatus],
+      status: atualizado?.status,
+    });
   } catch (error) {
     console.error("Erro ao atualizar:", error);
     return NextResponse.json({ error: "Erro interno." }, { status: 500 });
